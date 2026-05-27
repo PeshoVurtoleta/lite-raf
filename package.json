@@ -1,6 +1,6 @@
 {
   "name": "@zakkster/lite-raf",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Zahary Shinikchiev <shinikchiev@yahoo.com>",
   "description": "Zero-GC, frame-rate scheduling for @zakkster/lite-signal. A single requestAnimationFrame loop, frameTime/frameDelta/frameCount as reactive signals, and rafEffect() — reactive effects that run at most once per frame. Built for canvas/WebGL render loops, games, and Twitch overlays.",
   "type": "module",
