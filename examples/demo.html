@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>@zakkster/lite-raf — frame telemetry</title>
+
+    <script type="importmap">
+{
+  "imports": {
+    "@zakkster/lite-signal": "https://cdn.jsdelivr.net/npm/@zakkster/lite-signal@1.1.2/+esm"
+  }
+}
+
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"/>
+
+    <style>
+        :root {
+            --bg: #07100d;
+            --bg2: #0a1814;
+            --grid: rgba(54, 224, 208, 0.06);
+            --ink: #c8f7ea;
+            --dim: #5e8c82;
+            --phosphor: #36e0d0;
+            --amber: #ffb000;
+            --amber-dim: #7a5a14;
+            --magenta: #ff5d9e;
+            --panel: rgba(8, 24, 20, 0.72);
+            --line: rgba(54, 224, 208, 0.18);
+            --glow: 0 0 12px rgba(54, 224, 208, 0.45);
+            --glow-amber: 0 0 14px rgba(255, 176, 0, 0.45);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+        }
+
+        body {
+            background: radial-gradient(1200px 700px at 70% -10%, rgba(54, 224, 208, 0.08), transparent 60%),
+            radial-gradient(900px 600px at 5% 110%, rgba(255, 176, 0, 0.06), transparent 55%), var(--bg);
+            color: var(--ink);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+            linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+            background-size: 32px 32px;
+            mask-image: radial-gradient(circle at 50% 40%, #000 60%, transparent 100%);
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.18) 2px 3px);
+            mix-blend-mode: multiply;
+            opacity: 0.5;
+        }
+
+        .wrap {
+            position: relative;
+            z-index: 3;
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 28px 22px 64px;
+        }
+
+        header {
+            display: flex;
+            align-items: baseline;
+            gap: 14px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 16px;
+        }
+
+        .logo {
+            font-family: "Chakra Petch", sans-serif;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            font-size: 26px;
+            color: var(--ink);
+            text-shadow: var(--glow);
+        }
+
+        .logo b {
+            color: var(--phosphor);
+        }
+
+        .tag {
+            color: var(--dim);
+            font-size: 12.5px;
+        }
+
+        .pill {
+            margin-left: auto;
+            font-family: "Chakra Petch", sans-serif;
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: var(--amber);
+            border: 1px solid var(--amber-dim);
+            padding: 4px 10px;
+            border-radius: 2px;
+            text-shadow: var(--glow-amber);
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.45fr 1fr;
+            gap: 18px;
+            margin-top: 20px;
+            align-items: start;
+        }
+
+        @media (max-width: 880px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            backdrop-filter: blur(2px);
+            position: relative;
+        }
+
+        .panel > h2 {
+            font-family: "Chakra Petch", sans-serif;
+            font-weight: 600;
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--phosphor);
+            margin: 0;
+            padding: 11px 14px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .panel > h2 .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--phosphor);
+            box-shadow: var(--glow);
+        }
+
+        .panel .body {
+            padding: 14px;
+        }
+
+        canvas#stage {
+            display: block;
+            width: 100%;
+            height: 380px;
+            background: radial-gradient(120% 120% at 50% 0%, rgba(54, 224, 208, 0.05), transparent 70%);
+        }
+
+        .readouts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            background: var(--line);
+        }
+
+        .ro {
+            background: var(--bg2);
+            padding: 12px 14px;
+        }
+
+        .ro .k {
+            color: var(--dim);
+            font-size: 10.5px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .ro .v {
+            font-family: "Chakra Petch", sans-serif;
+            font-weight: 700;
+            font-size: 26px;
+            color: var(--ink);
+            text-shadow: var(--glow);
+            margin-top: 2px;
+        }
+
+        .ro .v.amber {
+            color: var(--amber);
+            text-shadow: var(--glow-amber);
+        }
+
+        .ro .v small {
+            font-size: 12px;
+            color: var(--dim);
+            font-family: "IBM Plex Mono";
+            font-weight: 500;
+        }
+
+        canvas#scope {
+            display: block;
+            width: 100%;
+            height: 70px;
+            margin-top: 1px;
+            background: var(--bg2);
+        }
+
+        .ctrl {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        label.sl {
+            display: block;
+        }
+
+        label.sl .lab {
+            display: flex;
+            justify-content: space-between;
+            color: var(--dim);
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        label.sl .lab b {
+            color: var(--phosphor);
+            font-family: "Chakra Petch";
+        }
+
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--phosphor);
+            margin-top: 6px;
+        }
+
+        button {
+            font-family: "Chakra Petch", sans-serif;
+            font-weight: 600;
+            letter-spacing: 1px;
+            font-size: 11.5px;
+            text-transform: uppercase;
+            color: var(--ink);
+            background: rgba(54, 224, 208, 0.07);
+            border: 1px solid var(--line);
+            border-radius: 2px;
+            padding: 9px 13px;
+            cursor: pointer;
+            transition: all .12s ease;
+        }
+
+        button:hover {
+            background: rgba(54, 224, 208, 0.16);
+            box-shadow: var(--glow);
+            color: #fff;
+        }
+
+        button.amber {
+            color: var(--amber);
+            border-color: var(--amber-dim);
+            background: rgba(255, 176, 0, 0.06);
+        }
+
+        button.amber:hover {
+            background: rgba(255, 176, 0, 0.15);
+            box-shadow: var(--glow-amber);
+        }
+
+        button.danger {
+            color: var(--magenta);
+            border-color: rgba(255, 93, 158, 0.3);
+            background: rgba(255, 93, 158, 0.06);
+        }
+
+        .note {
+            color: var(--dim);
+            font-size: 11.5px;
+            line-height: 1.55;
+        }
+
+        .note b {
+            color: var(--amber);
+            font-weight: 500;
+        }
+
+        code {
+            color: var(--phosphor);
+            background: rgba(54, 224, 208, 0.08);
+            padding: 1px 5px;
+            border-radius: 2px;
+            font-size: 12px;
+        }
+
+        .proof, .trap {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            background: var(--line);
+            margin-top: 4px;
+        }
+
+        .proof .cell, .trap .cell {
+            background: var(--bg2);
+            padding: 12px 14px;
+            text-align: center;
+        }
+
+        .proof .cell .k, .trap .cell .k {
+            color: var(--dim);
+            font-size: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .proof .cell .v, .trap .cell .v {
+            font-family: "Chakra Petch";
+            font-weight: 700;
+            font-size: 24px;
+            margin-top: 3px;
+        }
+
+        .proof .cell.writes .v, .trap .bad .v {
+            color: var(--magenta);
+            text-shadow: 0 0 12px rgba(255, 93, 158, .4);
+        }
+
+        .proof .cell.runs .v, .trap .good .v {
+            color: var(--phosphor);
+            text-shadow: var(--glow);
+        }
+
+        .trap .verdict {
+            font-size: 10.5px;
+            margin-top: 4px;
+        }
+
+        .trap .bad .verdict {
+            color: var(--magenta);
+        }
+
+        .trap .good .verdict {
+            color: var(--phosphor);
+        }
+
+        footer {
+            margin-top: 26px;
+            color: var(--dim);
+            font-size: 11px;
+            border-top: 1px solid var(--line);
+            padding-top: 14px;
+        }
+
+        footer b {
+            color: var(--ink);
+        }
+
+        .live {
+            color: var(--phosphor);
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <header>
+        <div class="logo"><b>lite</b>-raf</div>
+        <div class="tag">frame-rate scheduling for a reactive signals graph · zero retained GC</div>
+        <div class="pill" id="loopState">● running</div>
+    </header>
+
+    <div class="grid">
+        <div class="panel">
+            <h2><span class="dot"></span> Stage — every body is a rafEffect</h2>
+            <canvas id="stage"></canvas>
+            <canvas id="scope"></canvas>
+            <div class="readouts">
+                <div class="ro">
+                    <div class="k">FPS (computed from dt)</div>
+                    <div class="v amber" id="fps">—</div>
+                </div>
+                <div class="ro">
+                    <div class="k">frameDelta</div>
+                    <div class="v"><span id="dtVal">—</span>
+                        <small> ms</small>
+                    </div>
+                </div>
+                <div class="ro">
+                    <div class="k">frameCount</div>
+                    <div class="v" id="fc">—</div>
+                </div>
+                <div class="ro">
+                    <div class="k">active rafEffects</div>
+                    <div class="v" id="ne">—</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ctrl">
+            <div class="panel"><h2><span class="dot"></span> Loop &amp; scale</h2>
+                <div class="body ctrl">
+                    <label class="sl">
+                        <span class="lab">orbiting bodies (one rafEffect each) <b id="bodyN">120</b></span>
+                        <input type="range" id="bodies" min="0" max="300" value="120"/>
+                    </label>
+                    <div class="note">Each body's motion is its own <code>rafEffect</code> reading
+                        <code>frameDelta()</code>.
+                    </div>
+                    <div class="row">
+                        <button id="pauseBtn" class="amber">Pause motion</button>
+                        <button id="killBtn" class="danger">Kill loop</button>
+                        <button id="startBtn">Start loop</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel"><h2><span class="dot"></span> Coalescing (Zero-GC Dedupe)</h2>
+                <div class="body">
+                    <div class="note">Hammer a state signal <b>5,000×</b> synchronously. A <code>rafEffect</code> runs
+                        <b>once</b>, at the frame boundary, with the final value.
+                    </div>
+                    <div class="proof">
+                        <div class="cell writes">
+                            <div class="k">signal writes</div>
+                            <div class="v" id="writes">0</div>
+                        </div>
+                        <div class="cell runs">
+                            <div class="k">effect runs</div>
+                            <div class="v" id="runs">0</div>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-top:12px;">
+                        <button id="hammerBtn">Hammer 5,000×</button>
+                        <button id="resetProof">Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel"><h2><span class="dot"></span> The fixed-rate-display trap</h2>
+                <div class="body">
+                    <div class="trap">
+                        <div class="cell bad">
+                            <div class="k">naive (Object.is)</div>
+                            <div class="v" id="trapBad">0</div>
+                            <div class="verdict" id="trapBadV">ticking…</div>
+                        </div>
+                        <div class="cell good">
+                            <div class="k">lite-raf (forced)</div>
+                            <div class="v" id="trapGood">0</div>
+                            <div class="verdict" id="trapGoodV">ticking…</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <b>@zakkster/lite-raf</b> · <span class="live" id="liveTick">●</span> live · everything on this page is driven
+        by <code>rafEffect</code>.
+    </footer>
+</div>
+
+<script type="module">
+    import {signal, computed} from "@zakkster/lite-signal";
+    import {rafEffect, frameDelta, frameCount, startFrames, stopFrames} from "../RAF.js";
+
+    // ── DOM Caching (Zero hot-path lookups) ───────────────────────────────────
+    const $ = (id) => document.getElementById(id);
+    const els = {
+        stage: $("stage"), scope: $("scope"),
+        fps: $("fps"), dtVal: $("dtVal"), fc: $("fc"), ne: $("ne"),
+        bodyN: $("bodyN"), writes: $("writes"), runs: $("runs"),
+        trapBad: $("trapBad"), trapBadV: $("trapBadV"),
+        trapGood: $("trapGood"), trapGoodV: $("trapGoodV"),
+        liveTick: $("liveTick"), loopState: $("loopState"),
+        // Inputs
+        bodies: $("bodies"), pauseBtn: $("pauseBtn"), killBtn: $("killBtn"),
+        startBtn: $("startBtn"), hammerBtn: $("hammerBtn"), resetProof: $("resetProof")
+    };
+
+    const sctx = els.stage.getContext("2d", {alpha: false});
+    const pctx = els.scope.getContext("2d", {alpha: false});
+
+    function fit(c, ctx) {
+        const r = c.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+        c.width = r.width * dpr;
+        c.height = r.height * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        return r;
+    }
+
+    let stageRect = fit(els.stage, sctx), scopeRect = fit(els.scope, pctx);
+    addEventListener("resize", () => {
+        stageRect = fit(els.stage, sctx);
+        scopeRect = fit(els.scope, pctx);
+    });
+
+    // ── State signals ──────────────────────────────────────────────────────────
+    const playing = signal(true);
+
+    let fpsAvg = 60;
+    const fps = computed(() => {
+        const dt = frameDelta();
+        if (dt > 0) fpsAvg += ((1000 / dt) - fpsAvg) * 0.1;
+        return fpsAvg;
+    });
+
+    // ── Bodies (Zero string-allocation in draw loop) ───────────────────────────
+    const bodies = [];
+
+    function makeBody(i) {
+        const hue = 150 + Math.random() * 60;
+        const b = {
+            angle: Math.random() * Math.PI * 2,
+            radius: 40 + Math.random() * (Math.min(stageRect.width, 380) * 0.38),
+            speed: (0.3 + Math.random() * 1.1) * (Math.random() < 0.5 ? -1 : 1),
+            size: 2 + Math.random() * 4,
+            x: 0, y: 0,
+            // Cache style strings to prevent GC thrashing per frame
+            fillStr: `hsla(${hue}, 80%, 62%, 0.9)`,
+            shadowStr: `hsla(${hue}, 90%, 60%, 0.9)`
+        };
+
+        b.dispose = rafEffect(() => {
+            const dt = frameDelta() / 1000;
+            if (playing()) b.angle += b.speed * dt;
+            const cx = stageRect.width / 2, cy = 190;
+            b.x = cx + Math.cos(b.angle) * b.radius;
+            b.y = cy + Math.sin(b.angle * 1.0) * b.radius * 0.62;
+        });
+        return b;
+    }
+
+    function setBodyCount(n) {
+        while (bodies.length < n) bodies.push(makeBody(bodies.length));
+        while (bodies.length > n) bodies.pop().dispose();
+        els.bodyN.textContent = n;
+        els.ne.textContent = bodies.length + renderEffects;
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────────────
+    const renderEffects = 1;
+    rafEffect(() => {
+        frameCount();
+        const w = stageRect.width, h = 380;
+
+        sctx.fillStyle = "#0a1814"; // Solid background for alpha: false canvas
+        sctx.fillRect(0, 0, w, h);
+
+        const cx = w / 2, cy = 190;
+        const g = sctx.createRadialGradient(cx, cy, 0, cx, cy, 70);
+        g.addColorStop(0, "rgba(255,176,0,0.20)");
+        g.addColorStop(1, "rgba(255,176,0,0)");
+
+        sctx.fillStyle = g;
+        sctx.beginPath();
+        sctx.arc(cx, cy, 70, 0, 7);
+        sctx.fill();
+
+        sctx.fillStyle = "#ffb000";
+        sctx.beginPath();
+        sctx.arc(cx, cy, 4, 0, 7);
+        sctx.fill();
+
+        for (let i = 0; i < bodies.length; i++) {
+            const b = bodies[i];
+            sctx.beginPath();
+            sctx.fillStyle = b.fillStr;
+            sctx.shadowColor = b.shadowStr;
+            sctx.shadowBlur = 8;
+            sctx.arc(b.x, b.y, b.size, 0, 7);
+            sctx.fill();
+        }
+        sctx.shadowBlur = 0;
+    });
+
+    // ── Scope strip ────────────────────────────────────────────────────────────
+    const trace = new Float32Array(240);
+    let tracePos = 0;
+
+    rafEffect(() => {
+        const dt = frameDelta();
+        trace[tracePos % trace.length] = dt;
+        tracePos++;
+
+        const w = scopeRect.width, h = 70;
+        pctx.fillStyle = "#0a1814";
+        pctx.fillRect(0, 0, w, h);
+
+        pctx.strokeStyle = "rgba(255,176,0,0.35)";
+        pctx.setLineDash([4, 4]);
+        const budgetY = h - (16.67 / 40) * h;
+
+        pctx.beginPath();
+        pctx.moveTo(0, budgetY);
+        pctx.lineTo(w, budgetY);
+        pctx.stroke();
+
+        pctx.setLineDash([]);
+        pctx.strokeStyle = "#36e0d0";
+        pctx.lineWidth = 1.5;
+        pctx.beginPath();
+
+        for (let i = 0; i < trace.length; i++) {
+            const idx = (tracePos + i) % trace.length;
+            const x = (i / trace.length) * w;
+            const y = h - Math.min(trace[idx], 40) / 40 * h;
+            i === 0 ? pctx.moveTo(x, y) : pctx.lineTo(x, y);
+        }
+        pctx.stroke();
+    });
+
+    // ── UI Subs ────────────────────────────────────────────────────────────────
+    fps.subscribe(v => els.fps.textContent = v.toFixed(0));
+    frameDelta.subscribe(v => els.dtVal.textContent = v.toFixed(2));
+
+    let tickPhase = false;
+    frameCount.subscribe(v => {
+        els.fc.textContent = v;
+        tickPhase = !tickPhase;
+        els.liveTick.style.opacity = tickPhase ? "1" : "0.3";
+    });
+
+    // ── Proofs ─────────────────────────────────────────────────────────────────
+    const hammer = signal(0);
+    let totalWrites = 0, totalRuns = 0;
+    rafEffect(() => {
+        hammer();
+        totalRuns++;
+        els.runs.textContent = totalRuns;
+    });
+    els.hammerBtn.onclick = () => {
+        for (let i = 0; i < 5000; i++) {
+            hammer.set(hammer.peek() + 1);
+            totalWrites++;
+        }
+        els.writes.textContent = totalWrites;
+    };
+    els.resetProof.onclick = () => {
+        totalWrites = totalRuns = 0;
+        els.writes.textContent = els.runs.textContent = "0";
+    };
+
+    // ── Trap Test ──────────────────────────────────────────────────────────────
+    const naiveDelta = signal(0);
+    const forcedDelta = signal(0, {equals: () => false});
+    let naiveTicks = 0, forcedTicks = 0, trapFrames = 0, lastStable = 0;
+
+    naiveDelta.subscribe(() => {
+        naiveTicks++;
+        els.trapBad.textContent = naiveTicks;
+    });
+    forcedDelta.subscribe(() => {
+        forcedTicks++;
+        els.trapGood.textContent = forcedTicks;
+    });
+
+    rafEffect(() => {
+        const q = Math.round(frameDelta());
+        naiveDelta.set(q);
+        forcedDelta.set(q);
+        trapFrames++;
+        if (trapFrames % 30 === 0) {
+            const stalled = naiveTicks === lastStable;
+            els.trapBadV.textContent = stalled ? "FROZEN ✕ (delta repeated)" : "ticking…";
+            els.trapGoodV.textContent = "every frame ✓";
+            lastStable = naiveTicks;
+        }
+    });
+
+    // ── Controls ───────────────────────────────────────────────────────────────
+    els.bodies.oninput = (e) => setBodyCount(+e.target.value);
+    els.pauseBtn.onclick = () => {
+        playing.update(v => !v);
+        els.pauseBtn.textContent = playing.peek() ? "Pause motion" : "Resume motion";
+    };
+    els.killBtn.onclick = () => {
+        stopFrames();
+        els.loopState.textContent = "● stopped";
+        els.loopState.style.color = "var(--magenta)";
+    };
+    els.startBtn.onclick = () => {
+        startFrames();
+        els.loopState.textContent = "● running";
+        els.loopState.style.color = "var(--amber)";
+    };
+
+    // Initialize
+    setBodyCount(120);
+    startFrames();
+</script>
+</body>
+</html>

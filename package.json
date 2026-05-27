@@ -1,0 +1,70 @@
+{
+  "name": "@zakkster/lite-raf",
+  "version": "1.0.0",
+  "author": "Zahary Shinikchiev <shinikchiev@yahoo.com>",
+  "description": "Zero-GC, frame-rate scheduling for @zakkster/lite-signal. A single requestAnimationFrame loop, frameTime/frameDelta/frameCount as reactive signals, and rafEffect() — reactive effects that run at most once per frame. Built for canvas/WebGL render loops, games, and Twitch overlays.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "RAF.js",
+  "module": "RAF.js",
+  "types": "./RAF.d.ts",
+  "exports": {
+    ".": {
+      "node": "./RAF.js",
+      "import": "./RAF.js",
+      "types": "./RAF.d.ts",
+      "default": "./RAF.js"
+    }
+  },
+  "files": [
+    "RAF.js",
+    "RAF.d.ts",
+    "README.md",
+    "llms.txt",
+    "LICENSE.txt"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:gc": "node --expose-gc --test test/*.test.js",
+    "bench": "node --expose-gc bench/bench.js",
+    "verify": "npm run test:gc && npm run bench",
+    "demo": "node -e \"console.log('Open example/demo.html in any browser')\""
+  },
+  "keywords": [
+    "requestAnimationFrame",
+    "raf",
+    "game-loop",
+    "render-loop",
+    "frame",
+    "scheduler",
+    "signals",
+    "reactive",
+    "zero-gc",
+    "zero-allocation",
+    "animation",
+    "canvas",
+    "webgl",
+    "delta-time",
+    "lite-signal",
+    "twitch"
+  ],
+  "peerDependencies": {
+    "@zakkster/lite-signal": "^1.1.2"
+  },
+  "devDependencies": {
+    "@zakkster/lite-signal": "^1.1.2"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/PeshoVurtoleta/lite-raf#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PeshoVurtoleta/lite-raf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PeshoVurtoleta/lite-raf/issues",
+    "email": "shinikchiev@yahoo.com"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

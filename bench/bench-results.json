@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "node": "v23.5.0",
+    "platform": "darwin",
+    "arch": "x64",
+    "gc": true,
+    "frameMs": 16.7,
+    "when": "2026-05-27T02:05:05.522Z"
+  },
+  "throughput": [
+    {
+      "effectCount": 0,
+      "msPerFrame": 0.000412479,
+      "dispatchesPerSec": 0,
+      "pctOf60fps": 0.002469934131736527
+    },
+    {
+      "effectCount": 1,
+      "msPerFrame": 0.0011698969,
+      "dispatchesPerSec": 854776.1772853659,
+      "pctOf60fps": 0.007005370658682635
+    },
+    {
+      "effectCount": 10,
+      "msPerFrame": 0.00125572665,
+      "dispatchesPerSec": 7963516.582211582,
+      "pctOf60fps": 0.00751932125748503
+    },
+    {
+      "effectCount": 50,
+      "msPerFrame": 0.00409575765,
+      "dispatchesPerSec": 12207753.552019857,
+      "pctOf60fps": 0.024525494910179642
+    },
+    {
+      "effectCount": 100,
+      "msPerFrame": 0.00828352475,
+      "dispatchesPerSec": 12072155.636403453,
+      "pctOf60fps": 0.04960194461077845
+    },
+    {
+      "effectCount": 250,
+      "msPerFrame": 0.02280113625,
+      "dispatchesPerSec": 10964365.865758115,
+      "pctOf60fps": 0.13653375
+    },
+    {
+      "effectCount": 500,
+      "msPerFrame": 0.0405353411,
+      "dispatchesPerSec": 12334915.321583418,
+      "pctOf60fps": 0.24272659341317365
+    }
+  ],
+  "retained": [
+    {
+      "effectCount": 10,
+      "frames": 200000,
+      "totalBytes": 2552,
+      "bytesPerFrame": 0.01276
+    },
+    {
+      "effectCount": 100,
+      "frames": 200000,
+      "totalBytes": 13840,
+      "bytesPerFrame": 0.0692
+    }
+  ]
+}

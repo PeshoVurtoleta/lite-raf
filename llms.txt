@@ -1,0 +1,88 @@
+# @zakkster/lite-raf
+
+> Zero-GC frame-rate scheduling for the @zakkster/lite-signal reactive graph. A single
+> requestAnimationFrame loop exposes the frame clock as three reactive signals and provides
+> rafEffect(): reactive effects that run at most once per frame and every frame the loop ticks.
+> ESM-only. Peer-depends on @zakkster/lite-signal ^1.1.0. MIT. Author: Zahary Shinikchiev.
+
+## Install
+npm i @zakkster/lite-raf @zakkster/lite-signal
+@zakkster/lite-signal MUST be a peer dependency (single shared default registry). A second nested
+copy silently breaks the frame clock because frame signals live in lite-signal's default registry.
+
+## Import
+import { rafEffect, frameTime, frameDelta, frameCount, startFrames, stopFrames } from '@zakkster/lite-raf';
+
+## API
+- rafEffect(fn: () => void): () => void
+  Registers a lite-signal effect scheduled to the frame boundary. Body re-runs at the END of each
+  frame in which a tracked dependency changed; at most once per frame; every frame if it reads any
+  frame signal. Returns an idempotent dispose function.
+- frameTime: ReadonlyFrameSignal — current frame timestamp in ms (DOMHighResTimeStamp), monotonic.
+- frameDelta: ReadonlyFrameSignal — ms since previous frame; 0 on first frame; use as animation dt.
+- frameCount: ReadonlyFrameSignal — frames since module load; 32-bit, wraps negative after ~414 days @60fps.
+- startFrames(): void — start the rAF loop; idempotent; resets delta baseline (first delta = 0).
+- stopFrames(): void — stop loop, cancel pending frame; effects are RETAINED and resume on next start.
+
+ReadonlyFrameSignal: callable () => number (tracked read); .peek() => number (untracked);
+.subscribe(fn: (n:number)=>void) => (()=>void) unsubscribe. No .set — only the loop drives them.
+
+## Core semantics
+- AT MOST ONCE PER FRAME: many synchronous writes to an effect's deps between frames collapse to a
+  single run with the final values (lite-signal QUEUED flag set on first schedule, cleared only when
+  the effect actually runs at the frame boundary).
+- EVERY FRAME (fixed-rate-display safety): the three frame signals are created with equals:()=>false
+  so writes ALWAYS propagate even when the numeric value is bit-identical. Without this, a locked
+  60Hz display producing identical deltas would short-circuit lite-signal's Object.is equality and
+  FREEZE animations. This is intentional and tested.
+- ORDERING: loop re-arms rAF, writes (time,delta,count) inside one batch (so dependents see a
+  consistent triple and are queued once), lite-signal flush hands each dirty rafEffect to the
+  scheduler which parks it in a pre-allocated queue, loop drains the queue at the end of the SAME frame.
+- CASCADE LATENCY: a rafEffect that writes a signal another rafEffect reads schedules the downstream
+  effect for the NEXT frame (chains lag one frame per link).
+- DISPOSAL: a trampoline already queued for the current frame is neutralised by lite-signal's
+  generation guard if its effect was disposed first; the body will not run after disposal.
+- ERROR ISOLATION: a throwing effect is caught (console.error) and does not abort sibling effects.
+- LIFECYCLE: effects created before startFrames() run once on the first started frame with latest values.
+
+## Zero-GC / memory
+- Loop core: zero allocations per frame (pre-grown queue array reused forever; per-frame writes via a
+  single hoisted applyFrame function; loop re-arms with same reference).
+- rafEffect path: one transient, nursery-collected dispatch closure per ACTIVE effect per frame
+  (allocated by lite-signal's flush). Never retained.
+- Retained heap growth: ~0 (measured 0.025–0.048 bytes/frame over 200k frames, i.e. flat/no leak).
+
+## Performance (Node 22, Linux x64 CI sandbox; run `npm run bench` for your hardware)
+- ~1.3e7 effect-dispatches/sec steady state.
+- 100 effects: 0.008 ms/frame (0.048% of a 60fps 16.67ms budget).
+- 500 effects: 0.039 ms/frame (0.234% of budget).
+
+## Registry note
+Binds to lite-signal's default registry (node pool ~1024 nodes by default). For more nodes or
+isolated graphs, call setDefaultRegistry(createRegistry({ maxNodes, onCapacityExceeded: 'grow' }))
+BEFORE creating rafEffects.
+
+## Example: dt-based animation
+import { signal } from '@zakkster/lite-signal';
+import { rafEffect, frameDelta, startFrames } from '@zakkster/lite-raf';
+const x = signal(0);
+rafEffect(() => { x.update(px => px + 120 * frameDelta() / 1000); draw(x.peek()); });
+startFrames();
+
+## Example: pause via signal, no loop changes
+const playing = signal(true);
+rafEffect(() => { if (playing()) step(frameDelta()); render(); });
+pauseBtn.onclick = () => playing.update(v => !v);   // loop keeps running; motion stops
+
+## Gotchas
+- First frameDelta is 0 — guard divisions: 1000 / Math.max(frameDelta(), 0.001).
+- An effect that reads NOTHING reactive runs once (on first frame) and never again — read a frame
+  signal to get per-frame cadence.
+- Non-browser runtime: provide a requestAnimationFrame/cancelAnimationFrame shim (see test/harness.js).
+
+## Scripts
+npm test (14 tests) · npm run test:gc · npm run bench · npm run verify
+
+## Not in scope
+Rendering, tweening/easing, scene graph, fixed-timestep loops (run an accumulator inside a rafEffect),
+multiple independent clocks (single module singleton loop).
